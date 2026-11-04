@@ -1,0 +1,13 @@
+{
+  "name": "lan-transfer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "邻传：通过 Chrome 扩展在局域网内与手机互传文件。",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>邻传</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img src="icons/icon-32.png" alt="" width="32" height="32">
+        <div>
+          <h1>邻传</h1>
+          <p>电脑与手机之间传文件</p>
+        </div>
+      </div>
+      <button class="icon-button" id="refreshButton" type="button" aria-label="刷新文件" title="刷新文件">
+        <i data-lucide="refresh-cw"></i>
+      </button>
+    </header>
+
+    <section class="status-panel" id="statusPanel" aria-live="polite">
+      <span class="status-dot" id="statusDot"></span>
+      <div class="status-copy">
+        <strong id="statusTitle">正在连接本机助手</strong>
+        <span id="statusDetail">检查 127.0.0.1:34567</span>
+      </div>
+      <button class="text-button" id="retryButton" type="button" hidden>重试</button>
+    </section>
+
+    <section class="share-panel" aria-labelledby="shareTitle">
+      <div class="section-heading">
+        <div>
+          <h2 id="shareTitle">手机扫码下载</h2>
+          <p id="shareHint">添加文件后，手机扫一扫即可获取</p>
+        </div>
+        <span class="count-badge" id="fileCount">0 个文件</span>
+      </div>
+      <div class="share-body">
+        <div class="qr-shell" id="qrShell" aria-label="手机下载二维码">
+          <div class="qr-placeholder" id="qrPlaceholder">
+            <i data-lucide="qr-code"></i>
+            <span>等待文件</span>
+          </div>
+        </div>
+        <div class="share-actions">
+          <div class="url-field">
+            <span id="shareUrl">尚未启动</span>
+          </div>
+          <div class="button-row">
+            <button class="secondary-button" id="copyButton" type="button" disabled>
+              <i data-lucide="copy"></i>
+              <span>复制链接</span>
+            </button>
+            <button class="secondary-button" id="openButton" type="button" disabled>
+              <i data-lucide="external-link"></i>
+              <span>预览</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="addresses" id="addresses" hidden></div>
+      <p class="network-note" id="networkNote">手机与电脑需连接同一 Wi-Fi</p>
+    </section>
+
+    <section class="files-panel" aria-labelledby="filesTitle">
+      <div class="section-heading compact">
+        <div>
+          <h2 id="filesTitle">文件</h2>
+          <p>选择或拖入本地文件</p>
+        </div>
+        <button class="primary-button" id="addButton" type="button">
+          <i data-lucide="plus"></i>
+          <span>添加文件</span>
+        </button>
+        <input id="fileInput" type="file" multiple hidden>
+      </div>
+      <div class="upload-state" id="uploadState" hidden aria-live="polite">
+        <div class="upload-row">
+          <span id="uploadName">正在上传</span>
+          <span id="uploadProgress">0%</span>
+        </div>
+        <div class="progress-track"><span id="progressBar"></span></div>
+      </div>
+      <div class="file-list" id="fileList" role="list"></div>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon"><i data-lucide="folder-open"></i></div>
+        <strong>还没有文件</strong>
+        <span>添加文件后即可下载或扫码分享</span>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </main>
+
+  <script src="vendor/lucide.min.js"></script>
+  <script src="vendor/qrcode.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
