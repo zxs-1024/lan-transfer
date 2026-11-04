@@ -13,7 +13,7 @@
         <img src="icons/icon-32.png" alt="" width="32" height="32">
         <div>
           <h1>邻传</h1>
-          <p>电脑与手机之间传文件</p>
+          <p>电脑与手机之间传文件、文本</p>
         </div>
       </div>
       <button class="icon-button" id="refreshButton" type="button" aria-label="刷新文件" title="刷新文件">
@@ -33,16 +33,16 @@
     <section class="share-panel" aria-labelledby="shareTitle">
       <div class="section-heading">
         <div>
-          <h2 id="shareTitle">手机扫码下载</h2>
-          <p id="shareHint">添加文件后，手机扫一扫即可获取</p>
+          <h2 id="shareTitle">手机扫码取用</h2>
+          <p id="shareHint">添加文件或文本后，手机扫一扫即可获取</p>
         </div>
-        <span class="count-badge" id="fileCount">0 个文件</span>
+        <span class="count-badge" id="fileCount">0 项</span>
       </div>
       <div class="share-body">
         <div class="qr-shell" id="qrShell" aria-label="手机下载二维码">
           <div class="qr-placeholder" id="qrPlaceholder">
             <i data-lucide="qr-code"></i>
-            <span>等待文件</span>
+            <span>等待内容</span>
           </div>
         </div>
         <div class="share-actions">
@@ -63,6 +63,30 @@
       </div>
       <div class="addresses" id="addresses" hidden></div>
       <p class="network-note" id="networkNote">手机与电脑需连接同一 Wi-Fi</p>
+    </section>
+
+    <section class="texts-panel" aria-labelledby="textsTitle">
+      <div class="section-heading compact">
+        <div>
+          <h2 id="textsTitle">文本</h2>
+          <p>粘贴文本后立即添加到手机</p>
+        </div>
+        <span class="count-badge" id="textCount">0 条</span>
+      </div>
+      <label class="text-composer" for="textInput">
+        <i data-lucide="clipboard-paste"></i>
+        <textarea id="textInput" rows="2" maxlength="20000" placeholder="在这里粘贴文本..." aria-describedby="textLimit"></textarea>
+        <button class="primary-button add-text-button" id="addTextButton" type="button" aria-label="添加文本">
+          <i data-lucide="plus"></i>
+          <span>添加</span>
+        </button>
+      </label>
+      <div class="text-helper">
+        <span id="textLimit">粘贴后自动添加 · 最多 20,000 字符</span>
+        <span class="paste-hint">⌘V</span>
+      </div>
+      <div class="text-list" id="textList" role="list"></div>
+      <div class="text-empty" id="textEmpty">暂无文本，复制后在上方粘贴即可</div>
     </section>
 
     <section class="files-panel" aria-labelledby="filesTitle">

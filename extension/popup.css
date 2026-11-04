@@ -23,7 +23,7 @@ html,
 body {
   margin: 0;
   width: 420px;
-  min-height: 580px;
+  min-height: 600px;
   background: #eef3ee;
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -45,7 +45,7 @@ input:focus-visible {
 
 .app {
   overflow: hidden;
-  min-height: 556px;
+  min-height: 576px;
   border: 1px solid rgba(23, 55, 35, 0.08);
   border-radius: 12px;
   background: var(--surface);
@@ -375,6 +375,148 @@ input:focus-visible {
 
 .files-panel {
   padding: 0 18px 16px;
+}
+
+.texts-panel {
+  margin: 0 18px 14px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.text-composer {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  margin-top: 9px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid #d9e3da;
+  border-radius: 8px;
+  background: #fcfdfc;
+  cursor: text;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.text-composer:focus-within {
+  border-color: #a9c4af;
+  background: var(--surface);
+}
+
+.text-composer > svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 6px;
+  color: #7a8a7f;
+  stroke-width: 1.7;
+}
+
+#textInput {
+  width: 100%;
+  min-height: 42px;
+  max-height: 112px;
+  padding: 4px 0;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+#textInput::placeholder {
+  color: #94a097;
+}
+
+.add-text-button {
+  min-height: 30px;
+  margin-top: 1px;
+  padding: 5px 9px;
+}
+
+.text-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 5px;
+  color: #7d8981;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.paste-hint {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid #e0e7e1;
+  border-radius: 4px;
+  background: #f7faf7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+}
+
+.text-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 176px;
+  margin-top: 7px;
+  overflow-y: auto;
+}
+
+.text-list:empty {
+  display: none;
+}
+
+.text-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid #edf1ed;
+}
+
+.text-row:first-child {
+  border-top: 0;
+}
+
+.text-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #34463b;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.text-row-meta {
+  margin-top: 3px;
+  color: #87938a;
+  font-size: 9px;
+}
+
+.text-row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.text-empty {
+  margin-top: 7px;
+  padding: 11px;
+  border: 1px dashed #dbe4dc;
+  border-radius: 7px;
+  color: #8a968c;
+  font-size: 10px;
+  text-align: center;
+}
+
+.text-empty[hidden] {
+  display: none;
 }
 
 .section-heading.compact {

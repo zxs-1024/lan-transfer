@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "邻传",
   "version": "1.0.0",
-  "description": "在本机下载文件，或让同一局域网内的手机扫码下载。",
+  "description": "在本机下载文件、分享文本，或让同一局域网内的手机扫码取用。",
   "permissions": [
     "downloads"
   ],

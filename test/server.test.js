@@ -96,7 +96,7 @@ test('serves the phone page and supports byte ranges and HEAD', async (t) => {
   const page = await request(instance, `/s/${instance.token}/`);
   assert.equal(page.status, 200);
   assert.match(page.headers['content-type'], /^text\/html/);
-  assert.match(page.body.toString(), /文件已准备好/);
+  assert.match(page.body.toString(), /内容已准备好/);
   assert.doesNotMatch(page.body.toString(), /__SHARE_TOKEN__/);
   assert.match(page.body.toString(), new RegExp(`/s/${instance.token}/share\\.js`));
 
@@ -168,4 +168,100 @@ test('deletes metadata and file contents together', async (t) => {
   assert.equal(missing.status, 404);
   const list = await request(instance, '/api/files', { headers: { Origin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } });
   assert.equal(list.json().files.length, 0);
+});
+
+test('shares text through the desktop API and the phone listing', async (t) => {
+  const instance = await makeTestServer();
+  t.after(() => instance.cleanup());
+  const origin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const text = '会议纪要：明天 10:00 讨论上线计划。\n链接 https://example.com/a?b=1';
+
+  const created = await request(instance, '/api/texts', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  assert.equal(created.status, 201);
+  const textItem = created.json().textItem;
+  assert.equal(textItem.text, text);
+  assert.match(textItem.id, /^[a-f0-9]{24}$/);
+  assert.ok(Number.isFinite(Date.parse(textItem.createdAt)));
+
+  const info = await request(instance, '/api/info', { headers: { Origin: origin } });
+  assert.equal(info.status, 200);
+  assert.equal(info.json().texts.length, 1);
+  assert.equal(info.json().texts[0].id, textItem.id);
+  assert.equal(info.json().maxTextLength, 20000);
+
+  const phoneList = await request(instance, `/s/${instance.token}/api/texts`);
+  assert.equal(phoneList.status, 200);
+  assert.equal(phoneList.json().texts[0].text, text);
+
+  const phonePage = await request(instance, `/s/${instance.token}/`);
+  assert.match(phonePage.body.toString(), /共享文本/);
+  assert.doesNotMatch(phonePage.body.toString(), /id="loadingList"/);
+});
+
+test('validates text size, rejects empty text and deletes text', async (t) => {
+  const instance = await makeTestServer();
+  t.after(() => instance.cleanup());
+  const origin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+  const empty = await request(instance, '/api/texts', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '   ' })
+  });
+  assert.equal(empty.status, 400);
+
+  const tooLong = await request(instance, '/api/texts', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'a'.repeat(20001) })
+  });
+  assert.equal(tooLong.status, 413);
+
+  const malformed = await request(instance, '/api/texts', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: '{not json'
+  });
+  assert.equal(malformed.status, 400);
+
+  const created = await request(instance, '/api/texts', {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '删除我' })
+  });
+  const id = created.json().textItem.id;
+
+  const forbidden = await request(instance, `/api/texts/${id}`, { method: 'DELETE' });
+  assert.equal(forbidden.status, 200);
+
+  const listing = await request(instance, `/s/${instance.token}/api/texts`);
+  assert.equal(listing.json().texts.length, 0);
+
+  const hiddenTexts = await request(instance, '/s/wrong-token/api/texts');
+  assert.equal(hiddenTexts.status, 404);
+});
+
+test('keeps only the most recent 20 text items', async (t) => {
+  const instance = await makeTestServer();
+  t.after(() => instance.cleanup());
+  const origin = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+  for (let index = 0; index < 22; index += 1) {
+    const response = await request(instance, '/api/texts', {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: `item-${index}` })
+    });
+    assert.equal(response.status, 201);
+  }
+
+  const listing = await request(instance, `/s/${instance.token}/api/texts`);
+  const texts = listing.json().texts;
+  assert.equal(texts.length, 20);
+  assert.equal(texts[0].text, 'item-21');
+  assert.equal(texts[19].text, 'item-2');
 });

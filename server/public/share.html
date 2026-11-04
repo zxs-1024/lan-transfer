@@ -28,8 +28,22 @@
   <main class="page-shell">
     <section class="intro">
       <p class="eyebrow">来自 __HOSTNAME__</p>
-      <h1>文件已准备好</h1>
-      <p class="intro-copy">点击文件即可下载，也可以一次获取全部文件。</p>
+      <h1>内容已准备好</h1>
+      <p class="intro-copy">文件可点击下载，文本可一键复制到手机。</p>
+    </section>
+
+    <section class="text-panel" id="textPanel" aria-labelledby="textTitle" hidden>
+      <div class="panel-heading">
+        <div>
+          <h2 id="textTitle">共享文本</h2>
+          <p id="textSummary">正在读取文本</p>
+        </div>
+        <button class="download-all" id="copyAllButton" type="button">
+          <i data-lucide="copy"></i>
+          <span>全部复制</span>
+        </button>
+      </div>
+      <div class="text-list" id="textList" role="list"></div>
     </section>
 
     <section class="file-panel" aria-labelledby="listTitle">
@@ -44,16 +58,11 @@
         </button>
       </div>
 
-      <div class="loading-list" id="loadingList" aria-label="正在加载文件">
-        <div class="loading-row"></div>
-        <div class="loading-row"></div>
-        <div class="loading-row"></div>
-      </div>
       <div class="file-list" id="fileList" role="list"></div>
       <div class="empty-state" id="emptyState" hidden>
         <div class="empty-icon"><i data-lucide="package-open"></i></div>
         <h2>暂无共享文件</h2>
-        <p>请在电脑上的邻传扩展中添加文件，然后刷新此页面。</p>
+        <p>请在电脑上的邻传扩展中添加文件或文本，然后刷新此页面。</p>
         <button class="refresh-button" id="emptyRefreshButton" type="button">
           <i data-lucide="refresh-cw"></i>
           <span>刷新列表</span>
@@ -72,7 +81,7 @@
 
     <p class="footer-note">
       <i data-lucide="lock-keyhole"></i>
-      <span>仅同一网络中的访问者可查看此链接中的文件。</span>
+      <span>仅同一网络中的访问者可查看此链接中的内容。</span>
     </p>
   </main>
 

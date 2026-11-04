@@ -22,6 +22,7 @@ const elements = {
   shareActions: document.querySelector('.share-actions'),
   shareUrl: document.querySelector('#shareUrl'),
   fileCount: document.querySelector('#fileCount'),
+  textCount: document.querySelector('#textCount'),
   qrShell: document.querySelector('#qrShell'),
   qrPlaceholder: document.querySelector('#qrPlaceholder'),
   addresses: document.querySelector('#addresses'),
@@ -36,13 +37,21 @@ const elements = {
   uploadName: document.querySelector('#uploadName'),
   uploadProgress: document.querySelector('#uploadProgress'),
   progressBar: document.querySelector('#progressBar'),
+  textInput: document.querySelector('#textInput'),
+  addTextButton: document.querySelector('#addTextButton'),
+  textList: document.querySelector('#textList'),
+  textEmpty: document.querySelector('#textEmpty'),
+  textLimit: document.querySelector('#textLimit'),
   toast: document.querySelector('#toast')
 };
 
 const state = {
   info: null,
   uploading: false,
+  addingText: false,
   visibleFiles: [],
+  visibleTexts: [],
+  maxTextLength: 20000,
   toastTimer: null
 };
 
@@ -139,13 +148,16 @@ async function apiRequest(path, options) {
 function updateSharePanel() {
   const files = state.visibleFiles;
   const hasFiles = files.length > 0;
-  const shareUrl = state.info && hasFiles ? absoluteShareUrl(state.info.shareUrl) : '';
-  elements.fileCount.textContent = `${files.length} 个文件`;
-  elements.shareUrl.textContent = shareUrl || (state.info ? '添加文件后生成链接' : '尚未启动');
+  const texts = state.visibleTexts;
+  const hasContent = hasFiles || texts.length > 0;
+  const shareUrl = state.info && hasContent ? absoluteShareUrl(state.info.shareUrl) : '';
+  const itemCount = files.length + texts.length;
+  elements.fileCount.textContent = `${itemCount} 项`;
+  elements.shareUrl.textContent = shareUrl || (state.info ? '添加文件或文本后生成链接' : '尚未启动');
   elements.copyButton.disabled = !shareUrl;
   elements.openButton.disabled = !shareUrl;
   elements.shareActions.classList.toggle('disabled', !shareUrl);
-  elements.shareHint.textContent = hasFiles ? '手机扫码后可直接下载全部文件' : '添加文件后，手机扫一扫即可获取';
+  elements.shareHint.textContent = hasContent ? '手机扫码后可下载文件、复制文本' : '添加文件或文本后，手机扫一扫即可获取';
 
   const lanAvailable = Boolean(state.info?.lanAvailable);
   elements.networkNote.textContent = lanAvailable
@@ -252,26 +264,121 @@ function renderFiles() {
   updateSharePanel();
 }
 
+function renderTexts() {
+  elements.textList.replaceChildren();
+  elements.textEmpty.hidden = state.visibleTexts.length > 0;
+  elements.textCount.textContent = `${state.visibleTexts.length} 条`;
+  elements.textLimit.textContent = `粘贴后自动添加 · 最多 ${state.maxTextLength.toLocaleString('zh-CN')} 字符`;
+
+  for (const textItem of state.visibleTexts) {
+    const row = document.createElement('div');
+    row.className = 'text-row';
+    row.setAttribute('role', 'listitem');
+
+    const copy = document.createElement('div');
+    copy.className = 'file-copy';
+    const preview = document.createElement('p');
+    preview.className = 'text-preview';
+    preview.textContent = textItem.text;
+    const meta = document.createElement('div');
+    meta.className = 'text-row-meta';
+    meta.textContent = `${textItem.text.length.toLocaleString('zh-CN')} 字符 · ${formatDate(textItem.createdAt)}`;
+    copy.append(preview, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'text-row-actions';
+    const copyButton = createActionButton('download-button', 'copy', '复制文本到电脑剪贴板', () => copyTextFromComputer(textItem));
+    const deleteButton = createActionButton('delete-button', 'trash-2', '删除这条文本', () => deleteText(textItem, deleteButton));
+    actions.append(copyButton, deleteButton);
+
+    row.append(copy, actions);
+    elements.textList.append(row);
+  }
+
+  refreshIcons();
+}
+
 async function connect({ quiet = false } = {}) {
   if (!quiet) setStatus('', '正在连接本机助手', '检查 127.0.0.1:34567');
   try {
     const info = await apiRequest('/api/info');
     state.info = info;
     state.visibleFiles = info.files || [];
+    state.visibleTexts = info.texts || [];
+    state.maxTextLength = Number(info.maxTextLength) || state.maxTextLength;
     if (info.lanAvailable) {
       setStatus('connected', '手机分享已就绪', `${info.hostname} · ${info.addresses[0].interface}`);
     } else {
       setStatus('connected', '本机下载可以使用', '未检测到 Wi-Fi 地址，手机分享不可用');
     }
     renderFiles();
+    renderTexts();
   } catch (error) {
     state.info = null;
     state.visibleFiles = [];
+    state.visibleTexts = [];
     const message = error.code === 'OFFLINE'
       ? '请先启动本地助手，然后点击重试'
       : error.message;
     setStatus('error', '本机助手未连接', message, true);
     renderFiles();
+    renderTexts();
+  }
+}
+
+async function addText(rawText) {
+  const text = String(rawText || '');
+  if (!text.trim() || state.addingText || !state.info) return;
+  if (text.length > state.maxTextLength) {
+    showToast(`文本不能超过 ${state.maxTextLength.toLocaleString('zh-CN')} 个字符`, 'error');
+    return;
+  }
+
+  state.addingText = true;
+  elements.addTextButton.disabled = true;
+  try {
+    const payload = await apiRequest('/api/texts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    state.visibleTexts = [payload.textItem, ...state.visibleTexts].slice(0, 20);
+    elements.textInput.value = '';
+    renderTexts();
+    updateSharePanel();
+    showToast('文本已添加，手机端可复制');
+  } catch (error) {
+    if (error.code === 'OFFLINE') await connect({ quiet: true });
+    showToast(error.message, 'error');
+  } finally {
+    state.addingText = false;
+    elements.addTextButton.disabled = false;
+    elements.textInput.focus();
+  }
+}
+
+async function copyTextFromComputer(textItem) {
+  try {
+    await navigator.clipboard.writeText(textItem.text);
+    showToast('文本已复制到剪贴板');
+  } catch {
+    showToast('无法访问剪贴板', 'error');
+  }
+}
+
+async function deleteText(textItem, button) {
+  const confirmed = window.confirm('从手机共享列表中删除这条文本？');
+  if (!confirmed) return;
+  button.disabled = true;
+  try {
+    await apiRequest(`/api/texts/${textItem.id}`, { method: 'DELETE' });
+    state.visibleTexts = state.visibleTexts.filter((item) => item.id !== textItem.id);
+    renderTexts();
+    updateSharePanel();
+    showToast('已删除这条文本');
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message, 'error');
   }
 }
 
@@ -395,7 +502,7 @@ async function deleteFile(file, button) {
 }
 
 async function copyShareLink() {
-  if (!state.info || state.visibleFiles.length === 0) return;
+  if (!state.info || (state.visibleFiles.length === 0 && state.visibleTexts.length === 0)) return;
   const url = absoluteShareUrl(state.info.shareUrl);
   try {
     await navigator.clipboard.writeText(url);
@@ -406,11 +513,24 @@ async function copyShareLink() {
 }
 
 function openSharePage() {
-  if (!state.info || state.visibleFiles.length === 0) return;
+  if (!state.info || (state.visibleFiles.length === 0 && state.visibleTexts.length === 0)) return;
   chrome.tabs.create({ url: absoluteShareUrl(state.info.shareUrl) });
 }
 
 elements.addButton.addEventListener('click', () => elements.fileInput.click());
+elements.addTextButton.addEventListener('click', () => addText(elements.textInput.value));
+elements.textInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    addText(elements.textInput.value);
+  }
+});
+elements.textInput.addEventListener('paste', (event) => {
+  const pasted = event.clipboardData?.getData('text/plain');
+  if (!pasted) return;
+  event.preventDefault();
+  addText(pasted);
+});
 elements.fileInput.addEventListener('change', () => {
   uploadFiles(elements.fileInput.files);
   elements.fileInput.value = '';
@@ -438,4 +558,5 @@ document.addEventListener('drop', (event) => {
 });
 
 refreshIcons();
+renderTexts();
 connect();

@@ -11,6 +11,8 @@ const { pipeline } = require('node:stream/promises');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DEFAULT_PORT = 34567;
 const MAX_NAME_LENGTH = 180;
+const MAX_TEXT_LENGTH = 20000;
+const MAX_TEXT_ITEMS = 20;
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -178,9 +180,11 @@ async function createStorage(dataDir) {
   const root = dataDir || path.join(os.homedir(), '.lan-transfer');
   const filesDir = path.join(root, 'files');
   const metadataDir = path.join(root, 'metadata');
+  const textsDir = path.join(root, 'texts');
   await ensureDirectory(root);
   await ensureDirectory(filesDir);
   await ensureDirectory(metadataDir);
+  await ensureDirectory(textsDir);
 
   const token = await readOrCreateShareToken(root);
   const entries = await fsp.readdir(filesDir);
@@ -206,13 +210,55 @@ async function createStorage(dataDir) {
     return records.filter(Boolean).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 
+  async function getTextRecord(id) {
+    if (!/^[a-f0-9]{24}$/.test(id)) return null;
+    try {
+      const filePath = path.join(textsDir, `${id}.txt`);
+      const [text, stats] = await Promise.all([fsp.readFile(filePath, 'utf8'), fsp.stat(filePath)]);
+      return { id, text, createdAt: stats.birthtimeMs || stats.ctimeMs || Number.parseInt(id.slice(0, 8), 16) * 1000 };
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  async function listTextRecords() {
+    const names = await fsp.readdir(textsDir);
+    const records = await Promise.all(
+      names
+        .filter((name) => /^[a-f0-9]{24}\.txt$/.test(name))
+        .map((name) => getTextRecord(name.slice(0, -4)))
+    );
+    return records.filter(Boolean).sort((left, right) => right.createdAt - left.createdAt);
+  }
+
+  async function removeTextRecord(id) {
+    if (!/^[a-f0-9]{24}$/.test(id)) return false;
+    try {
+      await fsp.rm(path.join(textsDir, `${id}.txt`));
+      return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') return false;
+      throw error;
+    }
+  }
+
+  async function pruneTextRecords() {
+    const records = await listTextRecords();
+    await Promise.all(records.slice(MAX_TEXT_ITEMS).map((record) => removeTextRecord(record.id)));
+  }
+
   return {
     root,
     filesDir,
     metadataDir,
+    textsDir,
     token,
     getRecord,
     listRecords,
+    getTextRecord,
+    listTextRecords,
+    removeTextRecord,
     async addRecord({ name, mime, tempPath, size }) {
       const id = crypto.randomBytes(12).toString('hex');
       const storedPath = path.join(filesDir, `${id}.bin`);
@@ -250,6 +296,15 @@ async function createStorage(dataDir) {
     },
     filePath(id) {
       return path.join(filesDir, `${id}.bin`);
+    },
+    async addText(text) {
+      const createdAt = Date.now();
+      const id = `${Math.floor(createdAt / 1000).toString(16).padStart(8, '0')}${crypto.randomBytes(8).toString('hex')}`;
+      const textPath = path.join(textsDir, `${id}.txt`);
+      await fsp.writeFile(textPath, text, { mode: 0o600 });
+      await fsp.utimes(textPath, new Date(createdAt), new Date(createdAt));
+      await pruneTextRecords();
+      return { id, text, createdAt };
     }
   };
 }
@@ -297,6 +352,34 @@ function publicFile(record, token) {
     createdAt: record.createdAt,
     downloadUrl: `/s/${token}/download/${record.id}`
   };
+}
+
+function publicText(record) {
+  return {
+    id: record.id,
+    text: record.text,
+    createdAt: new Date(record.createdAt).toISOString()
+  };
+}
+
+function readRequestBody(req, limit = MAX_TEXT_LENGTH * 4 + 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        const error = new Error('请求内容过大');
+        error.code = 'PAYLOAD_TOO_LARGE';
+        reject(error);
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
 }
 
 async function streamDownload(req, res, storage, id) {
@@ -402,6 +485,7 @@ function createRequestHandler(storage, instanceInfo) {
 
       if (pathname === '/api/info' && method === 'GET') {
         const records = await storage.listRecords();
+        const texts = await storage.listTextRecords();
         const shareUrls = instanceInfo.lanAddresses.map((entry) => ({
           ...entry,
           url: `${entry.url}s/${storage.token}/`
@@ -414,8 +498,55 @@ function createRequestHandler(storage, instanceInfo) {
           lanAvailable: shareUrls.length > 0,
           addresses: shareUrls,
           shareUrl: shareUrls[0]?.url || `http://127.0.0.1:${instanceInfo.port}/s/${storage.token}/`,
-          files: records.map((record) => publicFile(record, storage.token))
+          files: records.map((record) => publicFile(record, storage.token)),
+          texts: texts.map(publicText),
+          maxTextLength: MAX_TEXT_LENGTH
         }, corsHeaders);
+        return;
+      }
+
+      if (pathname === '/api/texts' && method === 'GET') {
+        const texts = await storage.listTextRecords();
+        sendJson(res, 200, {
+          texts: texts.map(publicText),
+          maxTextLength: MAX_TEXT_LENGTH
+        }, corsHeaders);
+        return;
+      }
+
+      if (pathname === '/api/texts' && method === 'POST') {
+        let body;
+        try {
+          body = JSON.parse(await readRequestBody(req));
+        } catch (error) {
+          if (error.code === 'PAYLOAD_TOO_LARGE') {
+            sendJson(res, 413, { error: `文本不能超过 ${MAX_TEXT_LENGTH} 个字符。` }, corsHeaders);
+            return;
+          }
+          if (error instanceof SyntaxError) {
+            sendJson(res, 400, { error: '文本请求格式不正确。' }, corsHeaders);
+            return;
+          }
+          throw error;
+        }
+        const text = typeof body.text === 'string' ? body.text : '';
+        if (!text.trim()) {
+          sendJson(res, 400, { error: '不能添加空文本。' }, corsHeaders);
+          return;
+        }
+        if (text.length > MAX_TEXT_LENGTH) {
+          sendJson(res, 413, { error: `文本不能超过 ${MAX_TEXT_LENGTH} 个字符。` }, corsHeaders);
+          return;
+        }
+        const record = await storage.addText(text);
+        sendJson(res, 201, { textItem: publicText(record) }, corsHeaders);
+        return;
+      }
+
+      const deleteTextMatch = /^\/api\/texts\/([a-f0-9]{24})$/.exec(pathname);
+      if (deleteTextMatch && method === 'DELETE') {
+        const removed = await storage.removeTextRecord(deleteTextMatch[1]);
+        sendJson(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'Text not found.' }, corsHeaders);
         return;
       }
 
@@ -497,7 +628,7 @@ function createRequestHandler(storage, instanceInfo) {
       return;
     }
 
-    const publicApiMatch = /^\/s\/([A-Za-z0-9_-]+)\/api\/files\/?$/.exec(pathname);
+    const publicApiMatch = /^\/s\/([A-Za-z0-9_-]+)\/api\/(files|texts)\/?$/.exec(pathname);
     if (publicApiMatch) {
       if (!tokensMatch(publicApiMatch[1], storage.token)) {
         sendJson(res, 404, { error: 'Share link not found.' });
@@ -505,6 +636,14 @@ function createRequestHandler(storage, instanceInfo) {
       }
       if (method !== 'GET') {
         sendJson(res, 405, { error: 'Method not allowed.' });
+        return;
+      }
+      if (publicApiMatch[2] === 'texts') {
+        const texts = await storage.listTextRecords();
+        sendJson(res, 200, {
+          hostname: os.hostname(),
+          texts: texts.map(publicText)
+        });
         return;
       }
       const records = await storage.listRecords();
