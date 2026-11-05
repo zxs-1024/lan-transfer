@@ -11,6 +11,9 @@ const FILE_ICONS = {
   document: 'file-text',
   default: 'file'
 };
+const urlLanguage = getUrlLanguage();
+const translator = createTranslator(urlLanguage || localStorage.getItem(LANGUAGE_STORAGE_KEY));
+const t = (key, values) => translator.t(key, values);
 
 const elements = {
   fileList: document.querySelector('#fileList'),
@@ -25,18 +28,20 @@ const elements = {
   downloadAllButton: document.querySelector('#downloadAllButton'),
   emptyRefreshButton: document.querySelector('#emptyRefreshButton'),
   errorRefreshButton: document.querySelector('#errorRefreshButton'),
+  languageSwitch: document.querySelector('#languageSwitch'),
   toast: document.querySelector('#toast')
 };
 
 let visibleFiles = [];
 let visibleTexts = [];
+let loadState = 'loading';
 
 function showLoadingList() {
   if (document.querySelector('#loadingList')) return;
   const loadingList = document.createElement('div');
   loadingList.className = 'loading-list';
   loadingList.id = 'loadingList';
-  loadingList.setAttribute('aria-label', '正在加载文件');
+  loadingList.setAttribute('aria-label', t('loadingAria'));
 
   for (let index = 0; index < 3; index += 1) {
     const row = document.createElement('div');
@@ -63,13 +68,16 @@ function formatBytes(bytes) {
   return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
 
-function formatDate(isoDate) {
+const formatDate = (isoDate) => {
   try {
-    return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(isoDate));
+    return new Intl.DateTimeFormat(translator.language === 'zh' ? 'zh-CN' : 'en-US', {
+      month: 'numeric',
+      day: 'numeric'
+    }).format(new Date(isoDate));
   } catch {
     return '';
   }
-}
+};
 
 function categoryFor(file) {
   const type = file.mime || '';
@@ -132,11 +140,15 @@ function copyToClipboard(text) {
 }
 
 function renderTexts() {
+  if (loadState === 'error') {
+    elements.textPanel.hidden = true;
+    return;
+  }
   elements.textList.replaceChildren();
   const hasTexts = visibleTexts.length > 0;
   elements.textPanel.hidden = !hasTexts;
   elements.copyAllButton.disabled = !hasTexts;
-  elements.textSummary.textContent = `${visibleTexts.length} 条 · 点击复制`;
+  elements.textSummary.textContent = t('textSummary', { count: visibleTexts.length });
 
   for (const textItem of visibleTexts) {
     const row = document.createElement('div');
@@ -151,7 +163,7 @@ function renderTexts() {
     const meta = document.createElement('div');
     meta.className = 'file-meta';
     const length = document.createElement('span');
-    length.textContent = `${textItem.text.length.toLocaleString('zh-CN')} 字符`;
+    length.textContent = t('characters', { count: textItem.text.length.toLocaleString() });
     const date = document.createElement('span');
     date.textContent = formatDate(textItem.createdAt);
     meta.append(length, date);
@@ -160,8 +172,8 @@ function renderTexts() {
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'text-copy';
-    copyButton.title = '复制文本';
-    copyButton.setAttribute('aria-label', '复制文本');
+    copyButton.title = t('copyText');
+    copyButton.setAttribute('aria-label', t('copyText'));
     const copyIcon = document.createElement('i');
     copyIcon.dataset.lucide = 'copy';
     copyButton.append(copyIcon);
@@ -170,10 +182,10 @@ function renderTexts() {
       try {
         await copyToClipboard(textItem.text);
         copyButton.classList.add('copied');
-        showToast('已复制到手机剪贴板');
+        showToast(t('copiedToPhone'));
         setTimeout(() => copyButton.classList.remove('copied'), 1600);
       } catch {
-        showToast('复制失败，请长按文本手动复制');
+        showToast(t('copyFailedManual'));
       } finally {
         copyButton.disabled = false;
       }
@@ -189,12 +201,24 @@ function renderTexts() {
 function renderFiles() {
   elements.fileList.replaceChildren();
   const hasFiles = visibleFiles.length > 0;
+  if (loadState === 'error') {
+    elements.filePanel.hidden = false;
+    elements.emptyState.hidden = true;
+    elements.errorState.hidden = false;
+    elements.downloadAllButton.disabled = true;
+    elements.summary.textContent = t('connectionFailed');
+    return;
+  }
+  elements.errorState.hidden = true;
   elements.filePanel.hidden = !hasFiles && visibleTexts.length > 0;
   elements.emptyState.hidden = hasFiles || visibleTexts.length > 0;
   elements.downloadAllButton.disabled = !hasFiles;
   elements.summary.textContent = hasFiles
-    ? `${visibleFiles.length} 个文件 · 共 ${formatBytes(visibleFiles.reduce((sum, file) => sum + file.size, 0))}`
-    : '共享列表为空';
+    ? t('filesSummary', {
+      count: visibleFiles.length,
+      size: formatBytes(visibleFiles.reduce((sum, file) => sum + file.size, 0))
+    })
+    : t('emptyShare');
 
   for (const file of visibleFiles) {
     const row = document.createElement('div');
@@ -226,8 +250,8 @@ function renderFiles() {
     download.className = 'file-download';
     download.href = getDownloadUrl(file);
     download.download = file.name;
-    download.title = `下载 ${file.name}`;
-    download.setAttribute('aria-label', `下载 ${file.name}`);
+    download.title = t('downloadNamed', { name: file.name });
+    download.setAttribute('aria-label', t('downloadNamed', { name: file.name }));
     const downloadIcon = document.createElement('i');
     downloadIcon.dataset.lucide = 'download';
     download.append(downloadIcon);
@@ -240,12 +264,14 @@ function renderFiles() {
 }
 
 async function loadFiles() {
+  loadState = 'loading';
   showLoadingList();
   elements.emptyState.hidden = true;
   elements.errorState.hidden = true;
   elements.fileList.replaceChildren();
   elements.downloadAllButton.disabled = true;
-  elements.summary.textContent = '正在读取文件列表';
+  elements.summary.textContent = t('summaryLoading');
+  elements.textSummary.textContent = t('loadingText');
 
   try {
     const [filesResponse, textsResponse] = await Promise.all([
@@ -256,6 +282,7 @@ async function loadFiles() {
     const payload = await filesResponse.json();
     visibleFiles = Array.isArray(payload.files) ? payload.files : [];
     visibleTexts = textsResponse.ok ? ((await textsResponse.json()).texts || []) : [];
+    loadState = 'ready';
     renderFiles();
     renderTexts();
   } catch {
@@ -263,7 +290,8 @@ async function loadFiles() {
     elements.emptyState.hidden = true;
     elements.errorState.hidden = false;
     elements.textPanel.hidden = true;
-    elements.summary.textContent = '连接失败';
+    loadState = 'error';
+    elements.summary.textContent = t('connectionFailed');
     refreshIcons();
   } finally {
     removeLoadingList();
@@ -275,16 +303,16 @@ async function copyAllTexts() {
   const combined = visibleTexts.map((item) => item.text).join('\n\n');
   try {
     await copyToClipboard(combined);
-    showToast(`已复制 ${visibleTexts.length} 条文本`);
+    showToast(t('copyAllSuccess', { count: visibleTexts.length }));
   } catch {
-    showToast('复制失败，请逐条长按复制');
+    showToast(t('copyAllFailed'));
   }
 }
 
 async function downloadAll() {
   if (visibleFiles.length === 0) return;
   if (visibleFiles.length > 1) {
-    showToast('浏览器可能询问是否允许多个下载');
+    showToast(t('multipleDownloads'));
   }
   for (const [index, file] of visibleFiles.entries()) {
     triggerDownload(file);
@@ -294,11 +322,31 @@ async function downloadAll() {
   }
 }
 
+function applyLanguage(language, { persist = true } = {}) {
+  translator.setLanguage(language);
+  if (persist && !urlLanguage) localStorage.setItem(LANGUAGE_STORAGE_KEY, translator.language);
+  applyStaticTranslations(translator);
+  document.title = t('pageTitle');
+  document.querySelector('.brand').setAttribute('aria-label', t('homeLabel'));
+  renderFiles();
+  renderTexts();
+  if (loadState === 'loading') {
+    elements.summary.textContent = t('summaryLoading');
+    elements.textSummary.textContent = t('loadingText');
+  }
+}
+
 elements.downloadAllButton.addEventListener('click', downloadAll);
 elements.copyAllButton.addEventListener('click', copyAllTexts);
 elements.emptyRefreshButton.addEventListener('click', loadFiles);
 elements.errorRefreshButton.addEventListener('click', loadFiles);
+elements.languageSwitch.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-language]');
+  if (!button) return;
+  applyLanguage(button.dataset.language);
+});
 
 refreshIcons();
+applyLanguage(translator.language, { persist: false });
 renderTexts();
 loadFiles();

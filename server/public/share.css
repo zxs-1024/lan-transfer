@@ -65,6 +65,39 @@ a:focus-visible {
   margin: 0 auto;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.language-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.language-option {
+  min-width: 36px;
+  min-height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #718077;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.language-option[aria-pressed="true"] {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(27, 47, 34, 0.11);
+  color: var(--green-dark);
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -518,6 +551,15 @@ a:focus-visible {
 
   .secure-label span {
     display: none;
+  }
+
+  .header-actions {
+    gap: 9px;
+  }
+
+  .language-option {
+    min-width: 34px;
+    min-height: 36px;
   }
 
   .page-shell {

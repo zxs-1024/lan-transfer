@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>邻传</title>
+  <title>LAN Transfer</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -12,98 +12,104 @@
       <div class="brand">
         <img src="icons/icon-32.png" alt="" width="32" height="32">
         <div>
-          <h1>邻传</h1>
-          <p>电脑与手机之间传文件、文本</p>
+          <h1 data-i18n="brandName">LAN Transfer</h1>
+          <p data-i18n="brandSubtitle">Transfer files and text between devices</p>
         </div>
       </div>
-      <button class="icon-button" id="refreshButton" type="button" aria-label="刷新文件" title="刷新文件">
-        <i data-lucide="refresh-cw"></i>
-      </button>
+      <div class="topbar-actions">
+        <div class="language-switch" id="languageSwitch" role="group" aria-label="Language">
+          <button class="language-option" type="button" data-language="en" aria-pressed="true">EN</button>
+          <button class="language-option" type="button" data-language="zh" aria-pressed="false">中文</button>
+        </div>
+        <button class="icon-button" id="refreshButton" type="button" data-i18n-aria-label="refresh" data-i18n-title="refresh" aria-label="Refresh" title="Refresh">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </div>
     </header>
 
     <section class="status-panel" id="statusPanel" aria-live="polite">
       <span class="status-dot" id="statusDot"></span>
       <div class="status-copy">
-        <strong id="statusTitle">正在连接本机助手</strong>
-        <span id="statusDetail">检查 127.0.0.1:34567</span>
+        <strong id="statusTitle" data-i18n="connectingTitle">Connecting to helper</strong>
+        <span id="statusDetail" data-i18n="connectingDetail">Checking 127.0.0.1:34567</span>
       </div>
-      <button class="text-button" id="retryButton" type="button" hidden>重试</button>
+      <button class="text-button" id="retryButton" type="button" data-i18n="retry" hidden>Retry</button>
     </section>
 
     <section class="share-panel" aria-labelledby="shareTitle">
       <div class="section-heading">
         <div>
-          <h2 id="shareTitle">手机扫码取用</h2>
-          <p id="shareHint">添加文件或文本后，手机扫一扫即可获取</p>
+          <h2 id="shareTitle" data-i18n="phoneTitle">Open on your phone</h2>
+          <p id="shareHint" data-i18n="shareHintEmpty">Add a file or text, then scan with your phone</p>
         </div>
-        <span class="count-badge" id="fileCount">0 项</span>
+        <span class="count-badge" id="fileCount">0 items</span>
       </div>
       <div class="share-body">
-        <div class="qr-shell" id="qrShell" aria-label="手机下载二维码">
+        <div class="qr-shell" id="qrShell" aria-label="Phone access QR code">
           <div class="qr-placeholder" id="qrPlaceholder">
             <i data-lucide="qr-code"></i>
-            <span>等待内容</span>
+            <span data-i18n="waitingContent">Waiting for content</span>
           </div>
         </div>
         <div class="share-actions">
           <div class="url-field">
-            <span id="shareUrl">尚未启动</span>
+            <span id="shareUrl" data-i18n="notConnected">Not connected</span>
           </div>
           <div class="button-row">
             <button class="secondary-button" id="copyButton" type="button" disabled>
               <i data-lucide="copy"></i>
-              <span>复制链接</span>
+              <span data-i18n="copyLink">Copy link</span>
             </button>
             <button class="secondary-button" id="openButton" type="button" disabled>
               <i data-lucide="external-link"></i>
-              <span>预览</span>
+              <span data-i18n="preview">Preview</span>
             </button>
           </div>
         </div>
       </div>
       <div class="addresses" id="addresses" hidden></div>
-      <p class="network-note" id="networkNote">手机与电脑需连接同一 Wi-Fi</p>
+      <p class="network-note" id="networkNote" data-i18n="sameWifi">Phone and computer must use the same Wi-Fi</p>
     </section>
 
     <section class="texts-panel" aria-labelledby="textsTitle">
       <div class="section-heading compact">
         <div>
-          <h2 id="textsTitle">文本</h2>
-          <p>粘贴文本后立即添加到手机</p>
+          <h2 id="textsTitle" data-i18n="textsTitle">Text</h2>
+          <p data-i18n="textsHint">Paste text to share it instantly</p>
         </div>
-        <span class="count-badge" id="textCount">0 条</span>
+        <span class="count-badge" id="textCount">0 items</span>
       </div>
       <label class="text-composer" for="textInput">
         <i data-lucide="clipboard-paste"></i>
-        <textarea id="textInput" rows="2" maxlength="20000" placeholder="在这里粘贴文本..." aria-describedby="textLimit"></textarea>
-        <button class="primary-button add-text-button" id="addTextButton" type="button" aria-label="添加文本">
+        <textarea id="textInput" rows="2" maxlength="20000" placeholder="Paste text here..." data-i18n-placeholder="textPlaceholder" aria-describedby="textLimit"></textarea>
+        <button class="primary-button add-text-button" id="addTextButton" type="button" data-i18n-aria-label="addText" aria-label="Add text">
           <i data-lucide="plus"></i>
-          <span>添加</span>
+          <span data-i18n="add">Add</span>
         </button>
       </label>
       <div class="text-helper">
-        <span id="textLimit">粘贴后自动添加 · 最多 20,000 字符</span>
+        <span id="textLimit">Paste to add automatically · Up to 20,000 characters</span>
         <span class="paste-hint">⌘V</span>
       </div>
       <div class="text-list" id="textList" role="list"></div>
-      <div class="text-empty" id="textEmpty">暂无文本，复制后在上方粘贴即可</div>
+      <div class="text-empty" id="textEmpty" data-i18n="textEmpty">No shared text yet. Copy some text and paste it above.</div>
     </section>
 
     <section class="files-panel" aria-labelledby="filesTitle">
       <div class="section-heading compact">
         <div>
-          <h2 id="filesTitle">文件</h2>
-          <p>选择或拖入本地文件</p>
+          <h2 id="filesTitle" data-i18n="filesTitle">Files</h2>
+          <p data-i18n="filesHint">Choose or drop local files</p>
         </div>
         <button class="primary-button" id="addButton" type="button">
           <i data-lucide="plus"></i>
-          <span>添加文件</span>
+          <span data-i18n="addFile">Add files</span>
         </button>
         <input id="fileInput" type="file" multiple hidden>
       </div>
       <div class="upload-state" id="uploadState" hidden aria-live="polite">
         <div class="upload-row">
-          <span id="uploadName">正在上传</span>
+          <span id="uploadName" data-i18n="uploading">Uploading</span>
           <span id="uploadProgress">0%</span>
         </div>
         <div class="progress-track"><span id="progressBar"></span></div>
@@ -111,8 +117,8 @@
       <div class="file-list" id="fileList" role="list"></div>
       <div class="empty-state" id="emptyState">
         <div class="empty-icon"><i data-lucide="folder-open"></i></div>
-        <strong>还没有文件</strong>
-        <span>添加文件后即可下载或扫码分享</span>
+        <strong data-i18n="fileEmpty">No files yet</strong>
+        <span data-i18n="fileEmptyHint">Add files to download them or share by QR code</span>
       </div>
     </section>
 
@@ -121,6 +127,7 @@
 
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/qrcode.js"></script>
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

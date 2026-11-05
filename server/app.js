@@ -458,7 +458,7 @@ function createRequestHandler(storage, instanceInfo) {
     const pathname = url.pathname;
     const origin = req.headers.origin;
 
-    if (pathname === '/share.css' || pathname === '/apple-touch-icon.png' || pathname === '/vendor/lucide.min.js') {
+    if (pathname === '/share.css' || pathname === '/i18n.js' || pathname === '/apple-touch-icon.png' || pathname === '/vendor/lucide.min.js') {
       if (method !== 'GET' && method !== 'HEAD') {
         sendText(res, 405, 'Method not allowed');
         return;
@@ -608,7 +608,7 @@ function createRequestHandler(storage, instanceInfo) {
       return;
     }
 
-    const tokenizedScriptMatch = /^\/s\/([A-Za-z0-9_-]+)\/share\.js$/.exec(pathname);
+    const tokenizedScriptMatch = /^\/s\/([A-Za-z0-9_-]+)\/(share|i18n)\.js$/.exec(pathname);
     if (tokenizedScriptMatch) {
       if (!tokensMatch(tokenizedScriptMatch[1], storage.token)) {
         sendText(res, 404, 'Share link not found');
@@ -618,7 +618,7 @@ function createRequestHandler(storage, instanceInfo) {
         sendText(res, 405, 'Method not allowed');
         return;
       }
-      const script = (await fsp.readFile(path.join(PUBLIC_DIR, 'share.js'), 'utf8'))
+      const script = (await fsp.readFile(path.join(PUBLIC_DIR, `${tokenizedScriptMatch[2]}.js`), 'utf8'))
         .replaceAll('__SHARE_TOKEN__', JSON.stringify(tokenizedScriptMatch[1]).slice(1, -1));
       setPublicPageHeaders(res);
       res.setHeader('Content-Type', 'text/javascript; charset=utf-8');

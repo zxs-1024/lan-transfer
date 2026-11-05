@@ -2,6 +2,7 @@
 
 const API_BASE = 'http://127.0.0.1:34567';
 const MAX_CONCURRENT_UPLOADS = 2;
+const translator = createTranslator(localStorage.getItem(LANGUAGE_STORAGE_KEY));
 const FILE_ICONS = {
   image: 'image',
   video: 'video',
@@ -13,6 +14,7 @@ const FILE_ICONS = {
 
 const elements = {
   app: document.querySelector('.app'),
+  languageSwitch: document.querySelector('#languageSwitch'),
   statusPanel: document.querySelector('#statusPanel'),
   statusTitle: document.querySelector('#statusTitle'),
   statusDetail: document.querySelector('#statusDetail'),
@@ -67,18 +69,8 @@ function formatBytes(bytes) {
   return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
 
-function formatDate(isoDate) {
-  try {
-    return new Intl.DateTimeFormat('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(isoDate));
-  } catch {
-    return '';
-  }
-}
+const formatDate = (isoDate) => translator.formatDate(isoDate);
+const t = (key, values) => translator.t(key, values);
 
 function fileCategory(file) {
   const type = file.mime || file.type || '';
@@ -126,7 +118,7 @@ async function parseResponse(response) {
     payload = {};
   }
   if (!response.ok) {
-    throw new Error(payload.error || `请求失败（${response.status}）`);
+    throw new Error(payload.error || t('requestFailed', { status: response.status }));
   }
   return payload;
 }
@@ -136,7 +128,7 @@ async function apiRequest(path, options) {
   try {
     response = await fetch(`${API_BASE}${path}`, options);
   } catch {
-    const error = new Error('无法连接本机助手');
+    const error = new Error(t('helperUnavailable'));
     error.code = 'OFFLINE';
     throw error;
   }
@@ -152,17 +144,16 @@ function updateSharePanel() {
   const hasContent = hasFiles || texts.length > 0;
   const shareUrl = state.info && hasContent ? absoluteShareUrl(state.info.shareUrl) : '';
   const itemCount = files.length + texts.length;
-  elements.fileCount.textContent = `${itemCount} 项`;
-  elements.shareUrl.textContent = shareUrl || (state.info ? '添加文件或文本后生成链接' : '尚未启动');
+  elements.fileCount.textContent = t('items', { count: itemCount });
+  elements.shareUrl.textContent = shareUrl || (state.info ? t('addLinkPlaceholder') : t('notStarted'));
   elements.copyButton.disabled = !shareUrl;
   elements.openButton.disabled = !shareUrl;
   elements.shareActions.classList.toggle('disabled', !shareUrl);
-  elements.shareHint.textContent = hasContent ? '手机扫码后可下载文件、复制文本' : '添加文件或文本后，手机扫一扫即可获取';
+  elements.shareHint.textContent = hasContent ? t('shareReadyHint') : t('shareHintEmpty');
 
   const lanAvailable = Boolean(state.info?.lanAvailable);
   elements.networkNote.textContent = lanAvailable
-    ? '手机与电脑需连接同一 Wi-Fi；关闭助手后链接失效'
-    : '未检测到局域网地址，请检查 Wi-Fi 或点击刷新';
+    ? t('sameWifi') : t('noLanAddress');
 
   if (!shareUrl) {
     elements.qrShell.replaceChildren(elements.qrPlaceholder);
@@ -194,10 +185,10 @@ function drawQrCode(value) {
     template.innerHTML = svg;
     const codeElement = template.content.firstElementChild;
     codeElement.setAttribute('role', 'img');
-    codeElement.setAttribute('aria-label', '手机下载二维码');
+    codeElement.setAttribute('aria-label', t('qrLabel'));
     elements.qrShell.replaceChildren(codeElement);
   } catch (error) {
-    showToast(`二维码生成失败：${error.message}`, 'error');
+    showToast(t('qrFailed', { message: error.message }), 'error');
   }
 }
 
@@ -219,11 +210,11 @@ function renderFiles() {
   elements.emptyState.hidden = state.visibleFiles.length > 0;
   elements.emptyState.classList.toggle('pending-upload', state.uploading && state.visibleFiles.length === 0);
   if (state.uploading && state.visibleFiles.length === 0) {
-    elements.emptyState.querySelector('strong').textContent = '正在接收文件';
-    elements.emptyState.querySelector('span').textContent = '上传完成后会自动生成手机下载链接';
+    elements.emptyState.querySelector('strong').textContent = t('receivingFiles');
+    elements.emptyState.querySelector('span').textContent = t('receivingFilesHint');
   } else {
-    elements.emptyState.querySelector('strong').textContent = '还没有文件';
-    elements.emptyState.querySelector('span').textContent = '添加文件后即可下载或扫码分享';
+    elements.emptyState.querySelector('strong').textContent = t('fileEmpty');
+    elements.emptyState.querySelector('span').textContent = t('fileEmptyHint');
   }
 
   for (const file of state.visibleFiles) {
@@ -250,8 +241,8 @@ function renderFiles() {
 
     const actions = document.createElement('div');
     actions.className = 'file-actions';
-    const downloadButton = createActionButton('download-button', 'download', `下载 ${file.name}`, () => downloadFile(file));
-    const deleteButton = createActionButton('delete-button', 'trash-2', `删除 ${file.name}`, () => deleteFile(file, deleteButton));
+    const downloadButton = createActionButton('download-button', 'download', t('downloadFile', { name: file.name }), () => downloadFile(file));
+    const deleteButton = createActionButton('delete-button', 'trash-2', t('deleteFile', { name: file.name }), () => deleteFile(file, deleteButton));
     downloadButton.disabled = state.uploading;
     deleteButton.disabled = state.uploading;
     actions.append(downloadButton, deleteButton);
@@ -267,8 +258,8 @@ function renderFiles() {
 function renderTexts() {
   elements.textList.replaceChildren();
   elements.textEmpty.hidden = state.visibleTexts.length > 0;
-  elements.textCount.textContent = `${state.visibleTexts.length} 条`;
-  elements.textLimit.textContent = `粘贴后自动添加 · 最多 ${state.maxTextLength.toLocaleString('zh-CN')} 字符`;
+  elements.textCount.textContent = t('textItems', { count: state.visibleTexts.length });
+  elements.textLimit.textContent = t('textLimit', { count: state.maxTextLength.toLocaleString() });
 
   for (const textItem of state.visibleTexts) {
     const row = document.createElement('div');
@@ -282,13 +273,13 @@ function renderTexts() {
     preview.textContent = textItem.text;
     const meta = document.createElement('div');
     meta.className = 'text-row-meta';
-    meta.textContent = `${textItem.text.length.toLocaleString('zh-CN')} 字符 · ${formatDate(textItem.createdAt)}`;
+    meta.textContent = `${t('chars', { count: textItem.text.length.toLocaleString() })} · ${formatDate(textItem.createdAt)}`;
     copy.append(preview, meta);
 
     const actions = document.createElement('div');
     actions.className = 'text-row-actions';
-    const copyButton = createActionButton('download-button', 'copy', '复制文本到电脑剪贴板', () => copyTextFromComputer(textItem));
-    const deleteButton = createActionButton('delete-button', 'trash-2', '删除这条文本', () => deleteText(textItem, deleteButton));
+    const copyButton = createActionButton('download-button', 'copy', t('copyTextToComputer'), () => copyTextFromComputer(textItem));
+    const deleteButton = createActionButton('delete-button', 'trash-2', t('deleteText'), () => deleteText(textItem, deleteButton));
     actions.append(copyButton, deleteButton);
 
     row.append(copy, actions);
@@ -299,7 +290,7 @@ function renderTexts() {
 }
 
 async function connect({ quiet = false } = {}) {
-  if (!quiet) setStatus('', '正在连接本机助手', '检查 127.0.0.1:34567');
+  if (!quiet) setStatus('', t('connectingTitle'), t('connectingDetail'));
   try {
     const info = await apiRequest('/api/info');
     state.info = info;
@@ -307,9 +298,9 @@ async function connect({ quiet = false } = {}) {
     state.visibleTexts = info.texts || [];
     state.maxTextLength = Number(info.maxTextLength) || state.maxTextLength;
     if (info.lanAvailable) {
-      setStatus('connected', '手机分享已就绪', `${info.hostname} · ${info.addresses[0].interface}`);
+      setStatus('connected', t('connectedTitle'), `${info.hostname} · ${info.addresses[0].interface}`);
     } else {
-      setStatus('connected', '本机下载可以使用', '未检测到 Wi-Fi 地址，手机分享不可用');
+      setStatus('connected', t('localOnlyTitle'), t('localOnlyDetail'));
     }
     renderFiles();
     renderTexts();
@@ -318,9 +309,9 @@ async function connect({ quiet = false } = {}) {
     state.visibleFiles = [];
     state.visibleTexts = [];
     const message = error.code === 'OFFLINE'
-      ? '请先启动本地助手，然后点击重试'
+      ? t('offlineDetail')
       : error.message;
-    setStatus('error', '本机助手未连接', message, true);
+    setStatus('error', t('disconnectedTitle'), message, true);
     renderFiles();
     renderTexts();
   }
@@ -330,7 +321,7 @@ async function addText(rawText) {
   const text = String(rawText || '');
   if (!text.trim() || state.addingText || !state.info) return;
   if (text.length > state.maxTextLength) {
-    showToast(`文本不能超过 ${state.maxTextLength.toLocaleString('zh-CN')} 个字符`, 'error');
+    showToast(t('textTooLong', { count: state.maxTextLength.toLocaleString() }), 'error');
     return;
   }
 
@@ -346,7 +337,7 @@ async function addText(rawText) {
     elements.textInput.value = '';
     renderTexts();
     updateSharePanel();
-    showToast('文本已添加，手机端可复制');
+    showToast(t('textAdded'));
   } catch (error) {
     if (error.code === 'OFFLINE') await connect({ quiet: true });
     showToast(error.message, 'error');
@@ -360,14 +351,14 @@ async function addText(rawText) {
 async function copyTextFromComputer(textItem) {
   try {
     await navigator.clipboard.writeText(textItem.text);
-    showToast('文本已复制到剪贴板');
+    showToast(t('textCopied'));
   } catch {
-    showToast('无法访问剪贴板', 'error');
+    showToast(t('clipboardUnavailable'), 'error');
   }
 }
 
 async function deleteText(textItem, button) {
-  const confirmed = window.confirm('从手机共享列表中删除这条文本？');
+  const confirmed = window.confirm(t('confirmDeleteText'));
   if (!confirmed) return;
   button.disabled = true;
   try {
@@ -375,7 +366,7 @@ async function deleteText(textItem, button) {
     state.visibleTexts = state.visibleTexts.filter((item) => item.id !== textItem.id);
     renderTexts();
     updateSharePanel();
-    showToast('已删除这条文本');
+    showToast(t('textDeleted'));
   } catch (error) {
     button.disabled = false;
     showToast(error.message, 'error');
@@ -421,11 +412,11 @@ function uploadOne(file) {
       if (request.status >= 200 && request.status < 300) {
         resolve(payload.file);
       } else {
-        reject(new Error(payload.error || `上传失败（${request.status}）`));
+        reject(new Error(payload.error || t('uploadFailed', { status: request.status })));
       }
     });
-    request.addEventListener('error', () => reject(new Error('上传时与本机助手断开连接')));
-    request.addEventListener('abort', () => reject(new Error('上传已取消')));
+    request.addEventListener('error', () => reject(new Error(t('uploadDisconnected'))));
+    request.addEventListener('abort', () => reject(new Error(t('uploadCancelled'))));
     request.send(file);
   });
 }
@@ -434,7 +425,7 @@ async function uploadFiles(fileList) {
   const files = Array.from(fileList || []);
   if (files.length === 0 || state.uploading) return;
   if (!state.info) {
-    showToast('请先启动本机助手', 'error');
+    showToast(t('startHelperFirst'), 'error');
     return;
   }
 
@@ -446,7 +437,7 @@ async function uploadFiles(fileList) {
   async function worker() {
     while (queue.length > 0) {
       const file = queue.shift();
-      elements.uploadName.textContent = `正在上传 ${file.name}`;
+      elements.uploadName.textContent = t('uploadingFile', { name: file.name });
       try {
         await uploadOne(file);
         completed += 1;
@@ -461,9 +452,9 @@ async function uploadFiles(fileList) {
     await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_UPLOADS, files.length) }, worker));
     await connect({ quiet: true });
     if (completed > 0 && failed === 0) {
-      showToast(`已添加 ${completed} 个文件`);
+      showToast(t('fileAdded', { count: completed }));
     } else if (completed > 0) {
-      showToast(`已添加 ${completed} 个文件，${failed} 个失败`, 'error');
+      showToast(t('filesPartiallyAdded', { count: completed, failed }), 'error');
     }
   } finally {
     setUploading(false);
@@ -479,22 +470,22 @@ async function downloadFile(file) {
       conflictAction: 'uniquify',
       saveAs: false
     });
-    if (!downloadId) throw new Error('下载未开始');
-    showToast(`正在下载 ${file.name}`);
+    if (!downloadId) throw new Error(t('downloadNotStarted'));
+    showToast(t('downloading', { name: file.name }));
   } catch (error) {
-    showToast(`无法下载：${error.message}`, 'error');
+    showToast(t('downloadFailed', { message: error.message }), 'error');
   }
 }
 
 async function deleteFile(file, button) {
-  const confirmed = window.confirm(`从共享列表中删除“${file.name}”？\n\n本机原文件不会被删除。`);
+  const confirmed = window.confirm(t('confirmDeleteFile', { name: file.name }));
   if (!confirmed) return;
   button.disabled = true;
   try {
     await apiRequest(`/api/files/${file.id}`, { method: 'DELETE' });
     state.visibleFiles = state.visibleFiles.filter((item) => item.id !== file.id);
     renderFiles();
-    showToast('已从共享列表删除');
+    showToast(t('fileDeleted'));
   } catch (error) {
     button.disabled = false;
     showToast(error.message, 'error');
@@ -506,15 +497,45 @@ async function copyShareLink() {
   const url = absoluteShareUrl(state.info.shareUrl);
   try {
     await navigator.clipboard.writeText(url);
-    showToast('分享链接已复制');
+    showToast(t('shareLinkCopied'));
   } catch {
-    showToast('无法访问剪贴板，请在预览页复制地址', 'error');
+    showToast(t('copyLinkFailed'), 'error');
   }
 }
 
 function openSharePage() {
   if (!state.info || (state.visibleFiles.length === 0 && state.visibleTexts.length === 0)) return;
   chrome.tabs.create({ url: absoluteShareUrl(state.info.shareUrl) });
+}
+
+function renderStatus() {
+  if (!state.info) return;
+  if (state.info.lanAvailable) {
+    setStatus('connected', t('connectedTitle'), `${state.info.hostname} · ${state.info.addresses[0].interface}`);
+  } else {
+    setStatus('connected', t('localOnlyTitle'), t('localOnlyDetail'));
+  }
+}
+
+function applyLanguage(language, { persist = true } = {}) {
+  translator.setLanguage(language);
+  if (persist) localStorage.setItem(LANGUAGE_STORAGE_KEY, translator.language);
+  applyStaticTranslations(translator);
+  document.title = t('brandName');
+  elements.textInput.placeholder = t('textPlaceholder');
+  elements.textInput.setAttribute('aria-label', t('textsTitle'));
+  elements.qrShell.setAttribute('aria-label', t('qrLabel'));
+  elements.addTextButton.setAttribute('aria-label', t('addText'));
+  elements.fileInput.setAttribute('aria-label', t('selectFiles'));
+  if (state.info) {
+    renderStatus();
+  } else {
+    elements.retryButton.textContent = t('retry');
+    elements.statusTitle.textContent = t('connectingTitle');
+    elements.statusDetail.textContent = t('connectingDetail');
+  }
+  renderFiles();
+  renderTexts();
 }
 
 elements.addButton.addEventListener('click', () => elements.fileInput.click());
@@ -539,6 +560,11 @@ elements.retryButton.addEventListener('click', () => connect());
 elements.refreshButton.addEventListener('click', () => connect({ quiet: true }));
 elements.copyButton.addEventListener('click', copyShareLink);
 elements.openButton.addEventListener('click', openSharePage);
+elements.languageSwitch.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-language]');
+  if (!button) return;
+  applyLanguage(button.dataset.language);
+});
 
 for (const eventName of ['dragenter', 'dragover']) {
   document.addEventListener(eventName, (event) => {
@@ -557,6 +583,5 @@ document.addEventListener('drop', (event) => {
   if (event.dataTransfer?.files?.length) uploadFiles(event.dataTransfer.files);
 });
 
-refreshIcons();
-renderTexts();
+applyLanguage(translator.language, { persist: false });
 connect();

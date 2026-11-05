@@ -96,15 +96,22 @@ test('serves the phone page and supports byte ranges and HEAD', async (t) => {
   const page = await request(instance, `/s/${instance.token}/`);
   assert.equal(page.status, 200);
   assert.match(page.headers['content-type'], /^text\/html/);
-  assert.match(page.body.toString(), /内容已准备好/);
+  assert.match(page.body.toString(), /<html lang="en">/);
+  assert.match(page.body.toString(), /Content is ready/);
   assert.doesNotMatch(page.body.toString(), /__SHARE_TOKEN__/);
   assert.match(page.body.toString(), new RegExp(`/s/${instance.token}/share\\.js`));
+  assert.match(page.body.toString(), new RegExp(`/s/${instance.token}/i18n\\.js`));
 
   const shareScript = await request(instance, `/s/${instance.token}/share.js`);
   assert.equal(shareScript.status, 200);
   assert.match(shareScript.headers['content-type'], /^text\/javascript/);
   assert.match(shareScript.body.toString(), new RegExp(`const TOKEN = '${instance.token}'`));
   assert.doesNotMatch(shareScript.body.toString(), /__SHARE_TOKEN__/);
+
+  const shareTranslations = await request(instance, `/s/${instance.token}/i18n.js`);
+  assert.equal(shareTranslations.status, 200);
+  assert.match(shareTranslations.body.toString(), /LANGUAGE_STORAGE_KEY/);
+  assert.doesNotMatch(shareTranslations.body.toString(), /__SHARE_TOKEN__/);
 
   const listing = await request(instance, `/s/${instance.token}/api/files`);
   assert.equal(listing.status, 200);
@@ -198,7 +205,7 @@ test('shares text through the desktop API and the phone listing', async (t) => {
   assert.equal(phoneList.json().texts[0].text, text);
 
   const phonePage = await request(instance, `/s/${instance.token}/`);
-  assert.match(phonePage.body.toString(), /共享文本/);
+  assert.match(phonePage.body.toString(), /Shared text/);
   assert.doesNotMatch(phonePage.body.toString(), /id="loadingList"/);
 });
 
